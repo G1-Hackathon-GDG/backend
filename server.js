@@ -23,9 +23,28 @@ io.on("connection", (socket) => {
 // Make io accessible to controllers later
 app.set("io", io);
 
-// Connect DB then start server
-connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(
+      `Port ${PORT} is already in use. Stop the other process or change PORT in .env, for example PORT=5001.`
+    );
+    process.exit(1);
+  }
+
+  console.error(`Server failed to start: ${error.message}`);
+  process.exit(1);
 });
+
+async function startServer() {
+  try {
+    await connectDB();
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error(`Startup failed: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+startServer();
