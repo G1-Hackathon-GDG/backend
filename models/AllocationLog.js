@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const allocationLogSchema = new mongoose.Schema({
   cycleId: {
@@ -19,4 +19,4 @@ const allocationLogSchema = new mongoose.Schema({
   vouchersGenerated: { type: Number, default: 0 },
 });
 
-module.exports = mongoose.model("AllocationLog", allocationLogSchema);
+export default mongoose.model("AllocationLog", allocationLogSchema);

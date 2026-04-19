@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const TIER_MAP = {
   fuel_tanker: 1,
@@ -34,4 +34,4 @@ vehicleSchema.pre("save", function (next) {
   next();
 });
 
-module.exports = mongoose.model("Vehicle", vehicleSchema);
+export default mongoose.model("Vehicle", vehicleSchema);

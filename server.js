@@ -1,32 +1,38 @@
-require("dotenv").config();
-const http = require("http");
-const { Server } = require("socket.io");
-const app = require("./app");
-const connectDB = require("./config/db");
+import "dotenv/config";
+import http from "node:http";
+import { Server } from "socket.io";
+import app from "./app.js";
+import connectDB from "./config/db.js";
 
 const PORT = process.env.PORT || 5000;
-
-// Create HTTP server and attach Socket.io
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  },
 });
 
-// Basic Socket.io connection log (socketHandler will replace this later)
 io.on("connection", (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+  console.log(`Socket connected: ${socket.id}`);
+
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`Socket ${socket.id} joined room: ${userId}`);
+  });
+
   socket.on("disconnect", () => {
-    console.log(`❌ Socket disconnected: ${socket.id}`);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 
-// Make io accessible to controllers later
 app.set("io", io);
 
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
     console.error(
-      `Port ${PORT} is already in use. Stop the other process or change PORT in .env, for example PORT=5001.`
+      `Port ${PORT} is already in use. Stop the other process or change PORT in .env.`,
     );
     process.exit(1);
   }
@@ -39,7 +45,9 @@ async function startServer() {
   try {
     await connectDB();
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(
+        `FuelPass server running on port ${PORT} [${process.env.NODE_ENV}]`,
+      );
     });
   } catch (error) {
     console.error(`Startup failed: ${error.message}`);

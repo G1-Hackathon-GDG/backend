@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const voucherSchema = new mongoose.Schema(
   {
@@ -35,4 +35,4 @@ const voucherSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("Voucher", voucherSchema);
+export default mongoose.model("Voucher", voucherSchema);
