@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 const app = express();
 
@@ -12,7 +13,13 @@ app.use(
 );
 app.use(express.json());
 
+app.use((req, _res, next) => {
+  req.io = req.app.get("io");
+  next();
+});
+
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "FuelPass API is running" });
