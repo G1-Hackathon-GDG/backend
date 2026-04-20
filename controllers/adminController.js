@@ -5,40 +5,65 @@ import AllocationLog from "../models/AllocationLog.js";
 
 export async function getAdminStats(_req, res) {
   try {
-    const [
-      totalVehicles,
-      verifiedVehicles,
-      flaggedVehicles,
-      voucherStatusRows,
-      activeStations,
-      distributedFuelRows,
-      latestLog,
-    ] = await Promise.all([
-      Vehicle.countDocuments(),
-      Vehicle.countDocuments({ isVerified: true }),
-      Vehicle.countDocuments({ flagged: true }),
-      Voucher.aggregate([
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
+    const [vehicleStatsRows, voucherStatsRows, stationStatsRows, latestLog] =
+      await Promise.all([
+        Vehicle.aggregate([
+          {
+            $group: {
+              _id: null,
+              totalVehicles: { $sum: 1 },
+              verifiedVehicles: {
+                $sum: {
+                  $cond: [{ $eq: ["$isVerified", true] }, 1, 0],
+                },
+              },
+              flaggedVehicles: {
+                $sum: {
+                  $cond: [{ $eq: ["$flagged", true] }, 1, 0],
+                },
+              },
+            },
           },
-        },
-      ]),
-      Station.countDocuments({ isActive: true }),
-      Voucher.aggregate([
-        { $match: { status: "redeemed" } },
-        {
-          $group: {
-            _id: null,
-            liters: { $sum: "$fuelLiters" },
+        ]),
+        Voucher.aggregate([
+          {
+            $facet: {
+              byStatus: [
+                {
+                  $group: {
+                    _id: "$status",
+                    count: { $sum: 1 },
+                  },
+                },
+              ],
+              fuelDistributed: [
+                { $match: { status: "redeemed" } },
+                {
+                  $group: {
+                    _id: null,
+                    liters: { $sum: "$fuelLiters" },
+                  },
+                },
+              ],
+            },
           },
-        },
-      ]),
-      AllocationLog.findOne()
-        .sort({ timestamp: -1 })
-        .select("alertLevel timestamp"),
-    ]);
+        ]),
+        Station.aggregate([{ $match: { isActive: true } }, { $count: "count" }]),
+        AllocationLog.findOne()
+          .sort({ timestamp: -1 })
+          .select("alertLevel timestamp"),
+      ]);
+
+    const vehicleStats = vehicleStatsRows[0] ?? {
+      totalVehicles: 0,
+      verifiedVehicles: 0,
+      flaggedVehicles: 0,
+    };
+
+    const voucherStats = voucherStatsRows[0] ?? {
+      byStatus: [],
+      fuelDistributed: [],
+    };
 
     const vouchersByStatus = {
       pending: 0,
@@ -47,16 +72,19 @@ export async function getAdminStats(_req, res) {
       cancelled: 0,
     };
 
-    for (const row of voucherStatusRows) {
-      vouchersByStatus[row._id] = row.count;
+    for (const row of voucherStats.byStatus) {
+      if (row._id in vouchersByStatus) {
+        vouchersByStatus[row._id] = row.count;
+      }
     }
 
-    const totalFuelDistributed = distributedFuelRows[0]?.liters ?? 0;
+    const totalFuelDistributed = voucherStats.fuelDistributed[0]?.liters ?? 0;
+    const activeStations = stationStatsRows[0]?.count ?? 0;
 
     return res.json({
-      totalVehicles,
-      verifiedVehicles,
-      flaggedVehicles,
+      totalVehicles: vehicleStats.totalVehicles,
+      verifiedVehicles: vehicleStats.verifiedVehicles,
+      flaggedVehicles: vehicleStats.flaggedVehicles,
       vouchersByStatus,
       activeStations,
       totalFuelDistributed,
