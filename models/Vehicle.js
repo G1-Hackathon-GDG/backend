@@ -31,7 +31,6 @@ const vehicleSchema = new mongoose.Schema({
 
 vehicleSchema.pre("save", function (next) {
   if (this.vehicleType) this.tierLevel = TIER_MAP[this.vehicleType];
-  next();
 });
 
 export default mongoose.model("Vehicle", vehicleSchema);
