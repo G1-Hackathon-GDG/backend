@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 import Station from "../models/Station.js";
 import Voucher from "../models/Voucher.js";
 import StationLog from "../models/StationLog.js";
+import {
+  emitShortageAlert,
+  emitVoucherCancelled,
+  emitVoucherRedeemed,
+} from "../sockets/socketHandler.js";
 
 function isValidObjectId(value) {
   return mongoose.Types.ObjectId.isValid(value);
@@ -93,7 +98,9 @@ export async function getStations(req, res) {
     });
   } catch (error) {
     console.error("Get stations error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching stations." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching stations." });
   }
 }
 
@@ -112,7 +119,9 @@ export async function getStationById(req, res) {
     return res.json(station);
   } catch (error) {
     console.error("Get station by ID error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching station." });
   }
 }
 
@@ -166,7 +175,9 @@ export async function getStationSlots(req, res) {
     });
   } catch (error) {
     console.error("Get station slots error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching slots." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching slots." });
   }
 }
 
@@ -222,7 +233,8 @@ export async function getStationLog(req, res) {
     }));
 
     const combinedEvents = [...fuelEventItems, ...voucherEventItems].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
     const paginatedEvents = combinedEvents.slice(skip, skip + limit);
@@ -235,17 +247,27 @@ export async function getStationLog(req, res) {
     });
   } catch (error) {
     console.error("Get station log error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching station log." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching station log." });
   }
 }
 
 export async function createStation(req, res) {
   try {
-    const { name, city, location, currentFuelLiters, dailyCapacity, slotsPerHour } =
-      req.body;
+    const {
+      name,
+      city,
+      location,
+      currentFuelLiters,
+      dailyCapacity,
+      slotsPerHour,
+    } = req.body;
 
     if (!name?.trim() || !city?.trim()) {
-      return res.status(400).json({ message: "Station name and city are required." });
+      return res
+        .status(400)
+        .json({ message: "Station name and city are required." });
     }
 
     const parsedDailyCapacity = Number(dailyCapacity);
@@ -270,7 +292,9 @@ export async function createStation(req, res) {
     });
   } catch (error) {
     console.error("Create station error:", error.message);
-    return res.status(500).json({ message: "Server error while creating station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while creating station." });
   }
 }
 
@@ -281,7 +305,9 @@ export async function updateStationFuel(req, res) {
       return res.status(400).json({ message: "Invalid station ID." });
     }
 
-    const operation = String(req.body?.operation || "").trim().toLowerCase();
+    const operation = String(req.body?.operation || "")
+      .trim()
+      .toLowerCase();
     if (!["increment", "decrement"].includes(operation)) {
       return res.status(400).json({
         message: "operation must be either 'increment' or 'decrement'.",
@@ -333,7 +359,8 @@ export async function updateStationFuel(req, res) {
 
     const fuelEvent = await StationLog.create({
       stationId: id,
-      eventType: operation === "increment" ? "fuel_increment" : "fuel_decrement",
+      eventType:
+        operation === "increment" ? "fuel_increment" : "fuel_decrement",
       litersDelta: operation === "increment" ? liters : -liters,
       beforeLiters,
       afterLiters: station.currentFuelLiters,
@@ -342,6 +369,43 @@ export async function updateStationFuel(req, res) {
       notes: String(req.body?.notes || req.body?.reason || "").trim(),
     });
 
+    const io = req.io;
+    if (io && operation === "decrement") {
+      const lowFuelThreshold = Math.max(
+        Math.round(station.dailyCapacity * 0.25),
+        1,
+      );
+      if (station.currentFuelLiters <= lowFuelThreshold) {
+        emitShortageAlert(io, {
+          stationId: station._id.toString(),
+          stationName: station.name,
+          currentFuelLiters: station.currentFuelLiters,
+          lowFuelThreshold,
+          message: "Station fuel has dropped to shortage level.",
+        });
+      }
+
+      if (req.body?.voucherId) {
+        const voucher = await Voucher.findById(req.body.voucherId)
+          .populate("vehicleId", "ownerId ownerName plateNumber")
+          .select("vehicleId stationId fuelLiters qrToken status redeemedAt");
+
+        const driverRoomId = voucher?.vehicleId?.ownerId?.toString();
+        if (voucher && driverRoomId) {
+          emitVoucherRedeemed(io, {
+            voucherId: voucher._id.toString(),
+            stationId: station._id.toString(),
+            stationName: station.name,
+            vehicleId: voucher.vehicleId?._id?.toString() || null,
+            plateNumber: voucher.vehicleId?.plateNumber || null,
+            fuelLiters: voucher.fuelLiters,
+            qrToken: voucher.qrToken,
+            redeemedAt: voucher.redeemedAt || new Date(),
+          });
+        }
+      }
+    }
+
     return res.json({
       message: "Station fuel updated successfully.",
       station,
@@ -349,7 +413,9 @@ export async function updateStationFuel(req, res) {
     });
   } catch (error) {
     console.error("Update station fuel error:", error.message);
-    return res.status(500).json({ message: "Server error while updating fuel." });
+    return res
+      .status(500)
+      .json({ message: "Server error while updating fuel." });
   }
 }
 
@@ -370,13 +436,43 @@ export async function toggleStationStatus(req, res) {
     station.isActive = explicitStatus ?? !station.isActive;
     await station.save();
 
+    if (req.io && !station.isActive) {
+      const affectedVouchers = await Voucher.find({
+        stationId: station._id,
+        status: { $in: ["pending", "redeemed"] },
+      })
+        .populate("vehicleId", "ownerId ownerName plateNumber")
+        .select("vehicleId status fuelLiters qrToken");
+
+      emitShortageAlert(req.io, {
+        stationId: station._id.toString(),
+        stationName: station.name,
+        message: "Station has been deactivated.",
+      });
+
+      for (const voucher of affectedVouchers) {
+        const driverRoomId = voucher.vehicleId?.ownerId?.toString();
+        if (!driverRoomId) continue;
+
+        emitVoucherCancelled(req.io, driverRoomId, {
+          voucherId: voucher._id.toString(),
+          stationId: station._id.toString(),
+          stationName: station.name,
+          plateNumber: voucher.vehicleId?.plateNumber || null,
+          fuelLiters: voucher.fuelLiters,
+          reason: "Station deactivated. Voucher allocation cancelled.",
+        });
+      }
+    }
+
     return res.json({
       message: `Station is now ${station.isActive ? "active" : "inactive"}.`,
       station,
     });
   } catch (error) {
     console.error("Toggle station status error:", error.message);
-    return res.status(500).json({ message: "Server error while toggling station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while toggling station." });
   }
 }
-
