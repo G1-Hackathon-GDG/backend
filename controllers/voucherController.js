@@ -223,12 +223,24 @@ export async function redeemVoucher(req, res) {
         throw new Error("STATION_NOT_FOUND");
       }
 
+      const cycle = await Cycle.findById(voucher.cycleId).session(session);
+      if (!cycle) {
+        throw new Error("CYCLE_NOT_FOUND");
+      }
+
       if (station.currentFuelLiters < voucher.fuelLiters) {
         throw new Error("INSUFFICIENT_STATION_FUEL");
       }
 
+      if (cycle.totalFuelAvailable < voucher.fuelLiters) {
+        throw new Error("INSUFFICIENT_CYCLE_FUEL");
+      }
+
       station.currentFuelLiters -= voucher.fuelLiters;
       await station.save({ session });
+
+      cycle.totalFuelAvailable -= voucher.fuelLiters;
+      await cycle.save({ session });
 
       voucher.status = "redeemed";
       voucher.redeemedAt = new Date();
@@ -264,10 +276,18 @@ export async function redeemVoucher(req, res) {
     if (error.message === "STATION_NOT_FOUND") {
       return res.status(404).json({ message: "Station not found." });
     }
+    if (error.message === "CYCLE_NOT_FOUND") {
+      return res.status(404).json({ message: "Cycle not found." });
+    }
     if (error.message === "INSUFFICIENT_STATION_FUEL") {
       return res
         .status(400)
         .json({ message: "Station does not have enough fuel for this voucher." });
+    }
+    if (error.message === "INSUFFICIENT_CYCLE_FUEL") {
+      return res
+        .status(400)
+        .json({ message: "Cycle does not have enough fuel for this voucher." });
     }
 
     console.error("Redeem voucher error:", error.message);
