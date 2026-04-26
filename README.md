@@ -7,7 +7,7 @@ Backend service for the **G1 Hackathon (GDG)** project.
 - **MongoDB** (database)
 - **Mongoose** (ODM)
 
-> If this repo uses different technologies, tell me what they are and I’ll adjust this README.
+
 
 ## Getting started
 
