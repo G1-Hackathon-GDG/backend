@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Voucher from "../models/Voucher.js";
 import Vehicle from "../models/Vehicle.js";
 import Station from "../models/Station.js";
+import Cycle from "../models/Cycle.js";
+import { generateQRToken } from "../utils/generateQR.js";
 
 function endOfDay(dateValue) {
   const date = new Date(dateValue);
@@ -16,6 +18,81 @@ function isVoucherExpired(voucher) {
 async function getDriverVehicleIds(userId) {
   const vehicles = await Vehicle.find({ ownerId: userId }).select("_id");
   return vehicles.map((vehicle) => vehicle._id);
+}
+
+export async function issueVoucher(req, res) {
+  try {
+    const {
+      vehicleId,
+      stationId,
+      cycleId,
+      fuelLiters,
+      validDate,
+      timeSlot,
+    } = req.body;
+
+    const [vehicle, station, cycle] = await Promise.all([
+      Vehicle.findById(vehicleId).lean(),
+      Station.findById(stationId).lean(),
+      Cycle.findById(cycleId).lean(),
+    ]);
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehicle not found." });
+    }
+    if (!vehicle.isVerified || vehicle.flagged) {
+      return res.status(400).json({
+        message: "Voucher can only be issued for verified and unflagged vehicles.",
+      });
+    }
+
+    if (!station) {
+      return res.status(404).json({ message: "Station not found." });
+    }
+    if (!station.isActive) {
+      return res.status(400).json({ message: "Station is inactive." });
+    }
+
+    if (!cycle) {
+      return res.status(404).json({ message: "Cycle not found." });
+    }
+    if (cycle.status !== "active") {
+      return res.status(400).json({ message: "Cycle must be active." });
+    }
+
+    const voucher = await Voucher.create({
+      vehicleId: vehicle._id,
+      plateNumber: vehicle.plateNumber,
+      stationId: station._id,
+      stationName: station.name,
+      cycleId: cycle._id,
+      fuelLiters,
+      validDate,
+      timeSlot,
+      qrToken: generateQRToken(),
+      status: "pending",
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(String(vehicle.ownerId)).emit("voucher_issued", {
+        voucherId: voucher._id,
+        vehicleId: voucher.vehicleId,
+      });
+    }
+
+    return res.status(201).json({
+      message: "Voucher issued successfully.",
+      voucher,
+    });
+  } catch (error) {
+    if (error?.code === 11000 && error?.keyPattern?.qrToken) {
+      return res.status(409).json({ message: "QR token collision. Try again." });
+    }
+
+    console.error("Issue voucher error:", error.message);
+    return res.status(500).json({ message: "Server error." });
+  }
 }
 
 export async function getMyVoucher(req, res) {

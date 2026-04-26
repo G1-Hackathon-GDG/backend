@@ -60,6 +60,31 @@ export function validateRedeemVoucherBody(req, res, next) {
   return next();
 }
 
+export function validateIssueVoucherBody(req, res, next) {
+  const { vehicleId, stationId, cycleId, fuelLiters, validDate, timeSlot } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(vehicleId)) {
+    return res.status(400).json({ message: "Invalid vehicleId." });
+  }
+  if (!mongoose.Types.ObjectId.isValid(stationId)) {
+    return res.status(400).json({ message: "Invalid stationId." });
+  }
+  if (!mongoose.Types.ObjectId.isValid(cycleId)) {
+    return res.status(400).json({ message: "Invalid cycleId." });
+  }
+  if (typeof fuelLiters !== "number" || fuelLiters <= 0) {
+    return res.status(400).json({ message: "fuelLiters must be a positive number." });
+  }
+  if (!isValidDate(validDate)) {
+    return res.status(400).json({ message: "validDate must be a valid date." });
+  }
+  if (typeof timeSlot !== "string" || !timeSlot.trim()) {
+    return res.status(400).json({ message: "timeSlot is required." });
+  }
+
+  return next();
+}
+
 export function validateCancelVoucherBody(req, res, next) {
   const { reason } = req.body || {};
 

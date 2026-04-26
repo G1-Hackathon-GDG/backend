@@ -5,6 +5,7 @@ import {
   getMyVoucher,
   getVoucherHistory,
   getVoucherStats,
+  issueVoucher,
   redeemVoucher,
   verifyVoucherByToken,
 } from "../controllers/voucherController.js";
@@ -13,6 +14,7 @@ import { staffOrAdmin } from "../middleware/staffMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
 import {
   validateCancelVoucherBody,
+  validateIssueVoucherBody,
   validateMongoIdParam,
   validateRedeemVoucherBody,
 } from "../middleware/validationMiddleware.js";
@@ -33,6 +35,7 @@ router.post(
 
 router.get("/all", protect, adminOnly, getAllVouchers);
 router.get("/stats", protect, adminOnly, getVoucherStats);
+router.post("/issue", protect, adminOnly, validateIssueVoucherBody, issueVoucher);
 router.patch(
   "/:id/cancel",
   protect,
