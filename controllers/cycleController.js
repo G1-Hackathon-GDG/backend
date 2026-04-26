@@ -46,6 +46,16 @@ export async function getActiveCycle(req, res) {
   }
 }
 
+export async function getAllCycles(_req, res) {
+  try {
+    const cycles = await Cycle.find().sort({ createdAt: -1 }).lean();
+    return res.json({ count: cycles.length, cycles });
+  } catch (error) {
+    console.error("Get all cycles error:", error.message);
+    return res.status(500).json({ message: "Server error." });
+  }
+}
+
 export async function closeCycle(req, res) {
   try {
     const { id } = req.params;

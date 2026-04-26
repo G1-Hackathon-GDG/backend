@@ -7,4 +7,3 @@ export function allowRoles(...allowedRoles) {
     return next();
   };
 }
-
