@@ -10,7 +10,7 @@ import aiRoutes from "./routes/aiRoutes.js";
 
 const app = express();
 
-// ─── Middleware ───────────────────────────────────────────────────────────────
+// Middleware 
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -20,7 +20,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// Routes 
 app.use("/api/auth", authRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/stations", stationRoutes);
@@ -28,17 +28,17 @@ app.use("/api/vouchers", voucherRoutes);
 app.use("/api/cycles", cycleRoutes);
 app.use("/api/ai", aiRoutes);
 
-// ─── Health check ─────────────────────────────────────────────────────────────
+// Health check
 app.get("/", (req, res) => {
   res.json({ message: "FuelPass API is running" });
 });
 
-// ─── 404 Handler ──────────────────────────────────────────────────────────────
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ message: `Route ${req.originalUrl} not found.` });
 });
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
+// Global Error Handler
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err.message);
   res.status(err.status || 500).json({
