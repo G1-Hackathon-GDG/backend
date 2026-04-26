@@ -29,9 +29,8 @@ const vehicleSchema = new mongoose.Schema({
   registeredAt: { type: Date, default: Date.now },
 });
 
-vehicleSchema.pre("save", function (next) {
+vehicleSchema.pre("save", function () {
   if (this.vehicleType) this.tierLevel = TIER_MAP[this.vehicleType];
-  next();
 });
 
 export default mongoose.model("Vehicle", vehicleSchema);
