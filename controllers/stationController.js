@@ -93,7 +93,9 @@ export async function getStations(req, res) {
     });
   } catch (error) {
     console.error("Get stations error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching stations." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching stations." });
   }
 }
 
@@ -112,7 +114,9 @@ export async function getStationById(req, res) {
     return res.json(station);
   } catch (error) {
     console.error("Get station by ID error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching station." });
   }
 }
 
@@ -166,7 +170,9 @@ export async function getStationSlots(req, res) {
     });
   } catch (error) {
     console.error("Get station slots error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching slots." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching slots." });
   }
 }
 
@@ -222,7 +228,8 @@ export async function getStationLog(req, res) {
     }));
 
     const combinedEvents = [...fuelEventItems, ...voucherEventItems].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
     const paginatedEvents = combinedEvents.slice(skip, skip + limit);
@@ -235,17 +242,27 @@ export async function getStationLog(req, res) {
     });
   } catch (error) {
     console.error("Get station log error:", error.message);
-    return res.status(500).json({ message: "Server error while fetching station log." });
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching station log." });
   }
 }
 
 export async function createStation(req, res) {
   try {
-    const { name, city, location, currentFuelLiters, dailyCapacity, slotsPerHour } =
-      req.body;
+    const {
+      name,
+      city,
+      location,
+      currentFuelLiters,
+      dailyCapacity,
+      slotsPerHour,
+    } = req.body;
 
     if (!name?.trim() || !city?.trim()) {
-      return res.status(400).json({ message: "Station name and city are required." });
+      return res
+        .status(400)
+        .json({ message: "Station name and city are required." });
     }
 
     const parsedDailyCapacity = Number(dailyCapacity);
@@ -270,7 +287,9 @@ export async function createStation(req, res) {
     });
   } catch (error) {
     console.error("Create station error:", error.message);
-    return res.status(500).json({ message: "Server error while creating station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while creating station." });
   }
 }
 
@@ -281,7 +300,9 @@ export async function updateStationFuel(req, res) {
       return res.status(400).json({ message: "Invalid station ID." });
     }
 
-    const operation = String(req.body?.operation || "").trim().toLowerCase();
+    const operation = String(req.body?.operation || "")
+      .trim()
+      .toLowerCase();
     if (!["increment", "decrement"].includes(operation)) {
       return res.status(400).json({
         message: "operation must be either 'increment' or 'decrement'.",
@@ -333,7 +354,8 @@ export async function updateStationFuel(req, res) {
 
     const fuelEvent = await StationLog.create({
       stationId: id,
-      eventType: operation === "increment" ? "fuel_increment" : "fuel_decrement",
+      eventType:
+        operation === "increment" ? "fuel_increment" : "fuel_decrement",
       litersDelta: operation === "increment" ? liters : -liters,
       beforeLiters,
       afterLiters: station.currentFuelLiters,
@@ -349,7 +371,9 @@ export async function updateStationFuel(req, res) {
     });
   } catch (error) {
     console.error("Update station fuel error:", error.message);
-    return res.status(500).json({ message: "Server error while updating fuel." });
+    return res
+      .status(500)
+      .json({ message: "Server error while updating fuel." });
   }
 }
 
@@ -376,7 +400,8 @@ export async function toggleStationStatus(req, res) {
     });
   } catch (error) {
     console.error("Toggle station status error:", error.message);
-    return res.status(500).json({ message: "Server error while toggling station." });
+    return res
+      .status(500)
+      .json({ message: "Server error while toggling station." });
   }
 }
-
