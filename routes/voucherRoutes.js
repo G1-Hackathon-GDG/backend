@@ -1,48 +1,33 @@
 import express from "express";
 import {
-  cancelVoucher,
-  getAllVouchers,
   getMyVoucher,
   getVoucherHistory,
-  getVoucherStats,
-  issueVoucher,
-  redeemVoucher,
   verifyVoucherByToken,
+  redeemVoucher,
+  getAllVouchers,
+  getVoucherStats,
+  cancelVoucher,
 } from "../controllers/voucherController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { staffOrAdmin } from "../middleware/staffMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
-import {
-  validateCancelVoucherBody,
-  validateIssueVoucherBody,
-  validateMongoIdParam,
-  validateRedeemVoucherBody,
-} from "../middleware/validationMiddleware.js";
+import { staffOrAdmin } from "../middleware/staffMiddleware.js";
+import { allowRoles } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-router.get("/my", protect, getMyVoucher);
-router.get("/history", protect, getVoucherHistory);
+router.use(protect);
 
-router.get("/verify/:token", protect, staffOrAdmin, verifyVoucherByToken);
-router.post(
-  "/redeem",
-  protect,
-  staffOrAdmin,
-  validateRedeemVoucherBody,
-  redeemVoucher,
-);
+// Driver routes
+router.get("/my", allowRoles("driver"), getMyVoucher);
+router.get("/history", allowRoles("driver"), getVoucherHistory);
 
-router.get("/all", protect, adminOnly, getAllVouchers);
-router.get("/stats", protect, adminOnly, getVoucherStats);
-router.post("/issue", protect, adminOnly, validateIssueVoucherBody, issueVoucher);
-router.patch(
-  "/:id/cancel",
-  protect,
-  adminOnly,
-  validateMongoIdParam("id"),
-  validateCancelVoucherBody,
-  cancelVoucher,
-);
+// Admin routes
+router.get("/all", adminOnly, getAllVouchers);
+router.get("/stats", adminOnly, getVoucherStats);
+router.patch("/:id/cancel", adminOnly, cancelVoucher);
+
+// Staff routes — verify and redeem
+router.get("/verify/:token", staffOrAdmin, verifyVoucherByToken);
+router.post("/redeem", staffOrAdmin, redeemVoucher);
 
 export default router;

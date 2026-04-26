@@ -1,20 +1,20 @@
 import express from "express";
 import {
-  closeCycle,
   createCycle,
   getActiveCycle,
+  getAllCycles,
+  closeCycle,
 } from "../controllers/cycleController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
-import {
-  validateCreateCycleBody,
-  validateMongoIdParam,
-} from "../middleware/validationMiddleware.js";
 
 const router = express.Router();
 
-router.get("/active", protect, getActiveCycle);
-router.post("/", protect, adminOnly, validateCreateCycleBody, createCycle);
-router.patch("/:id/close", protect, adminOnly, validateMongoIdParam("id"), closeCycle);
+router.use(protect);
+
+router.get("/active", getActiveCycle); // all roles — frontend needs this
+router.get("/", adminOnly, getAllCycles);
+router.post("/", adminOnly, createCycle);
+router.patch("/:id/close", adminOnly, closeCycle);
 
 export default router;
