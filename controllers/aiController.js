@@ -7,7 +7,7 @@ import { runAllocationEngine } from "../utils/allocationEngine.js";
 import { callGemini } from "../utils/geminiClient.js";
 import { generateQRToken } from "../utils/generateQR.js";
 
-// ─── Helper: build Gemini prompt from live data ───────────────────────────────
+// Helper: build Gemini prompt from live data 
 function buildAllocationPrompt(vehicles, stations, cycle, context = "") {
   const tierCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
   vehicles.forEach((v) => {
@@ -52,7 +52,7 @@ Based on the Ethiopian government fuel rationing policy, generate the optimal al
   `.trim();
 }
 
-// ─── POST /api/ai/allocate ────────────────────────────────────────────────────
+// POST /api/ai/allocate 
 // Admin: run full AI allocation — creates all vouchers for the active cycle
 export async function runAllocation(req, res) {
   try {
@@ -234,7 +234,7 @@ export async function runAllocation(req, res) {
   }
 }
 
-// ─── POST /api/ai/simulate-shortage ──────────────────────────────────────────
+// POST /api/ai/simulate-shortage 
 // Admin: reduce all station fuel by 50%, re-run Gemini, cancel lowest tier vouchers
 export async function simulateShortage(req, res) {
   try {
@@ -375,7 +375,7 @@ export async function simulateShortage(req, res) {
   }
 }
 
-// ─── POST /api/ai/fraud-check ─────────────────────────────────────────────────
+// POST /api/ai/fraud-check
 // Admin: AI-assisted fraud analysis beyond the rule-based fraudChecker
 export async function aiFraudCheck(req, res) {
   try {
@@ -430,7 +430,7 @@ Respond ONLY with a JSON array, no markdown:
   }
 }
 
-// ─── GET /api/ai/logs ─────────────────────────────────────────────────────────
+// GET /api/ai/logs 
 // Admin: all AllocationLog documents, most recent first
 export async function getAILogs(req, res) {
   try {
