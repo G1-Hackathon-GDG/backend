@@ -5,7 +5,6 @@ import {
   getAllocationLogs,
   simulateShortage,
   runAllocation,
-  simulateShortage,
   aiFraudCheck,
   getAILogs,
 } from "../controllers/aiController.js";
@@ -16,16 +15,6 @@ const router = express.Router();
 
 router.use(protect, adminOnly);
 
-router.post("/allocate", allocateFuel);
-router.post("/simulate-shortage", simulateShortage);
-router.post("/fraud-check", fraudCheck);
-router.get("/logs", getAllocationLogs);
-router.use(protect);
-router.use(adminOnly);
-
-router.post("/allocate", runAllocation);
-router.post("/simulate-shortage", simulateShortage);
-router.post("/fraud-check", aiFraudCheck);
-router.get("/logs", getAILogs);
+// If you need to support both legacy and new AI endpoints, rename or refactor as needed.
 
 export default router;
