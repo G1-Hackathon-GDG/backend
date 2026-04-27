@@ -1,0 +1,162 @@
+{
+  "info": {
+    "name": "FuelPass API - Full Handoff",
+    "description": "Postman collection covering auth, vehicles, stations, vouchers, cycles, AI, and admin stats endpoints for team handoff.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "driverToken", "value": "" },
+    { "key": "staffToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "vehicleId", "value": "" },
+    { "key": "stationId", "value": "" },
+    { "key": "cycleId", "value": "" },
+    { "key": "voucherId", "value": "" },
+    { "key": "voucherToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Driver",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Driver Demo\",\n  \"email\": \"driver.demo@fuelpass.et\",\n  \"password\": \"Driver@123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Driver",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"driver.demo@fuelpass.et\",\n  \"password\": \"Driver@123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Admin/Staff Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/admin/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@fuelpass.et\",\n  \"password\": \"Admin@123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "item": [
+        { "name": "My Vehicles", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }], "url": "{{baseUrl}}/api/vehicles/me" } },
+        { "name": "All Vehicles", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vehicles/all" } },
+        { "name": "Vehicle By ID", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}" } },
+        { "name": "Verify Vehicle", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/verify" } },
+        { "name": "Flag Vehicle", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/flag", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Suspicious registration pattern\"\n}" } } },
+        { "name": "Unflag Vehicle", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/unflag" } }
+      ]
+    },
+    {
+      "name": "Stations",
+      "item": [
+        { "name": "List Stations", "request": { "method": "GET", "url": "{{baseUrl}}/api/stations" } },
+        { "name": "Station By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/stations/{{stationId}}" } },
+        { "name": "Station Slots", "request": { "method": "GET", "url": "{{baseUrl}}/api/stations/{{stationId}}/slots" } },
+        { "name": "Station Log", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }], "url": "{{baseUrl}}/api/stations/{{stationId}}/log" } },
+        { "name": "Create Station", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/stations", "body": { "mode": "raw", "raw": "{\n  \"name\": \"New Station\",\n  \"city\": \"Addis Ababa\",\n  \"location\": \"Megenagna\",\n  \"currentFuelLiters\": 50000,\n  \"dailyCapacity\": 20000\n}" } } },
+        { "name": "Update Station Fuel", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/stations/{{stationId}}/fuel", "body": { "mode": "raw", "raw": "{\n  \"liters\": 10000\n}" } } },
+        { "name": "Toggle Station Active", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/stations/{{stationId}}/toggle" } }
+      ]
+    },
+    {
+      "name": "Vouchers",
+      "item": [
+        { "name": "My Vouchers", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }], "url": "{{baseUrl}}/api/vouchers/my" } },
+        { "name": "Voucher History", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{driverToken}}" }], "url": "{{baseUrl}}/api/vouchers/history" } },
+        { "name": "Verify Voucher Token", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }], "url": "{{baseUrl}}/api/vouchers/verify/{{voucherToken}}" } },
+        { "name": "Redeem Voucher", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/vouchers/redeem", "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{voucherToken}}\"\n}" } } },
+        { "name": "All Vouchers", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vouchers/all" } },
+        { "name": "Voucher Stats", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/vouchers/stats" } },
+        { "name": "Cancel Voucher", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/vouchers/{{voucherId}}/cancel", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Shortage redistribution\"\n}" } } }
+      ]
+    },
+    {
+      "name": "Cycles",
+      "item": [
+        { "name": "Create Cycle", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/cycles", "body": { "mode": "raw", "raw": "{\n  \"cycleNumber\": 2,\n  \"startDate\": \"2026-04-20T00:00:00.000Z\",\n  \"endDate\": \"2026-05-05T00:00:00.000Z\",\n  \"totalFuelAvailable\": 250000,\n  \"distributionRules\": {\n    \"priorityWeights\": [60,25,12,3]\n  }\n}" } } },
+        { "name": "Get Active Cycle", "request": { "method": "GET", "url": "{{baseUrl}}/api/cycles/active" } },
+        { "name": "Close Cycle", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/cycles/{{cycleId}}/close" } }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        { "name": "AI Allocate", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/ai/allocate" } },
+        { "name": "AI Simulate Shortage", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/ai/simulate-shortage" } },
+        { "name": "AI Fraud Check", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/ai/fraud-check" } },
+        { "name": "AI Logs", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/ai/logs" } }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/admin/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "API Root",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/"
+          }
+        }
+      ]
+    }
+  ]
+}

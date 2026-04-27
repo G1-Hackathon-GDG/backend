@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 import Station from "../models/Station.js";
 import Voucher from "../models/Voucher.js";
 import StationLog from "../models/StationLog.js";
+import {
+  emitShortageAlert,
+  emitVoucherCancelled,
+  emitVoucherRedeemed,
+} from "../sockets/socketHandler.js";
 
 function isValidObjectId(value) {
   return mongoose.Types.ObjectId.isValid(value);
@@ -364,6 +369,43 @@ export async function updateStationFuel(req, res) {
       notes: String(req.body?.notes || req.body?.reason || "").trim(),
     });
 
+    const io = req.io;
+    if (io && operation === "decrement") {
+      const lowFuelThreshold = Math.max(
+        Math.round(station.dailyCapacity * 0.25),
+        1,
+      );
+      if (station.currentFuelLiters <= lowFuelThreshold) {
+        emitShortageAlert(io, {
+          stationId: station._id.toString(),
+          stationName: station.name,
+          currentFuelLiters: station.currentFuelLiters,
+          lowFuelThreshold,
+          message: "Station fuel has dropped to shortage level.",
+        });
+      }
+
+      if (req.body?.voucherId) {
+        const voucher = await Voucher.findById(req.body.voucherId)
+          .populate("vehicleId", "ownerId ownerName plateNumber")
+          .select("vehicleId stationId fuelLiters qrToken status redeemedAt");
+
+        const driverRoomId = voucher?.vehicleId?.ownerId?.toString();
+        if (voucher && driverRoomId) {
+          emitVoucherRedeemed(io, {
+            voucherId: voucher._id.toString(),
+            stationId: station._id.toString(),
+            stationName: station.name,
+            vehicleId: voucher.vehicleId?._id?.toString() || null,
+            plateNumber: voucher.vehicleId?.plateNumber || null,
+            fuelLiters: voucher.fuelLiters,
+            qrToken: voucher.qrToken,
+            redeemedAt: voucher.redeemedAt || new Date(),
+          });
+        }
+      }
+    }
+
     return res.json({
       message: "Station fuel updated successfully.",
       station,
@@ -393,6 +435,35 @@ export async function toggleStationStatus(req, res) {
       req.body?.isActive === undefined ? undefined : Boolean(req.body.isActive);
     station.isActive = explicitStatus ?? !station.isActive;
     await station.save();
+
+    if (req.io && !station.isActive) {
+      const affectedVouchers = await Voucher.find({
+        stationId: station._id,
+        status: { $in: ["pending", "redeemed"] },
+      })
+        .populate("vehicleId", "ownerId ownerName plateNumber")
+        .select("vehicleId status fuelLiters qrToken");
+
+      emitShortageAlert(req.io, {
+        stationId: station._id.toString(),
+        stationName: station.name,
+        message: "Station has been deactivated.",
+      });
+
+      for (const voucher of affectedVouchers) {
+        const driverRoomId = voucher.vehicleId?.ownerId?.toString();
+        if (!driverRoomId) continue;
+
+        emitVoucherCancelled(req.io, driverRoomId, {
+          voucherId: voucher._id.toString(),
+          stationId: station._id.toString(),
+          stationName: station.name,
+          plateNumber: voucher.vehicleId?.plateNumber || null,
+          fuelLiters: voucher.fuelLiters,
+          reason: "Station deactivated. Voucher allocation cancelled.",
+        });
+      }
+    }
 
     return res.json({
       message: `Station is now ${station.isActive ? "active" : "inactive"}.`,
