@@ -7,7 +7,6 @@ import vehicleRoutes from "./routes/vehicleRoutes.js";
 import stationRoutes from "./routes/stationRoutes.js";
 import voucherRoutes from "./routes/voucherRoutes.js";
 import cycleRoutes from "./routes/cycleRoutes.js";
-
 import aiRoutes from "./routes/aiRoutes.js";
 
 const app = express();
@@ -27,11 +26,10 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/stations", stationRoutes);
 app.use("/api/vouchers", voucherRoutes);
