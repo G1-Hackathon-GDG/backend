@@ -31,6 +31,7 @@
     "mongodb": "^7.1.0",
     "mongoose": "^9.4.1",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

@@ -7,6 +7,7 @@ import Vehicle from "./models/Vehicle.js";
 import Cycle from "./models/Cycle.js";
 import Voucher from "./models/Voucher.js";
 import AllocationLog from "./models/AllocationLog.js";
+import StationLog from "./models/StationLog.js";
 
 async function seed() {
   try {
@@ -19,6 +20,7 @@ async function seed() {
       Cycle.deleteMany({}),
       Voucher.deleteMany({}),
       AllocationLog.deleteMany({}),
+      StationLog.deleteMany({}),
     ]);
 
     const stations = await Station.insertMany([
