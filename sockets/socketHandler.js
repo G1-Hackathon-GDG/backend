@@ -27,6 +27,10 @@ export function emitVoucherIssued(io, userId, payload) {
 
 export function emitVoucherRedeemed(io, payload) {
   if (!io) return;
+  if (payload?.userId) {
+    io.to(payload.userId.toString()).emit("voucher_redeemed", payload);
+    return;
+  }
   io.emit("voucher_redeemed", payload);
 }
 

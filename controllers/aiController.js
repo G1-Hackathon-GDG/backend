@@ -6,6 +6,11 @@ import AllocationLog from "../models/AllocationLog.js";
 import { runAllocationEngine } from "../utils/allocationEngine.js";
 import { callGemini } from "../utils/geminiClient.js";
 import { generateQRToken } from "../utils/generateQR.js";
+import {
+  emitShortageAlert,
+  emitVoucherCancelled,
+  emitVoucherIssued,
+} from "../sockets/socketHandler.js";
 
 // Helper: build Gemini prompt from live data 
 function buildAllocationPrompt(vehicles, stations, cycle, context = "") {
@@ -81,6 +86,17 @@ export async function runAllocation(req, res) {
       return res
         .status(400)
         .json({ message: "No active stations with fuel available." });
+    }
+
+    const existingVouchers = await Voucher.countDocuments({
+      cycleId: cycle._id,
+      status: { $in: ["pending", "redeemed"] },
+    });
+    if (existingVouchers > 0) {
+      return res.status(409).json({
+        message:
+          "Allocation has already been run for the active cycle. Close the cycle or cancel existing vouchers before re-running.",
+      });
     }
 
     // 4. Run deterministic rule engine first
@@ -164,6 +180,8 @@ export async function runAllocation(req, res) {
       return {
         vehicleId: vehicle._id,
         plateNumber: vehicle.plateNumber,
+        vehicleType: vehicle.vehicleType,
+        tierLevel: vehicle.tierLevel,
         stationId: slotInfo.stationId,
         stationName: slotInfo.stationName,
         cycleId: cycle._id,
@@ -178,6 +196,11 @@ export async function runAllocation(req, res) {
     const createdVouchers = await Voucher.insertMany(voucherDocs, {
       ordered: false,
     });
+
+    const ownerLookup = vehicles.reduce((acc, vehicle) => {
+      acc[vehicle._id.toString()] = vehicle.ownerId?.toString() || null;
+      return acc;
+    }, {});
 
     // 9. Save AllocationLog
     const log = await AllocationLog.create({
@@ -198,9 +221,11 @@ export async function runAllocation(req, res) {
     const io = req.app.get("io");
     if (io) {
       for (const voucher of createdVouchers) {
-        io.to(voucher.vehicleId.toString()).emit("voucher_issued", {
+        emitVoucherIssued(io, ownerLookup[voucher.vehicleId.toString()], {
           voucherId: voucher._id,
+          vehicleId: voucher.vehicleId,
           plateNumber: voucher.plateNumber,
+          tierLevel: voucher.tierLevel,
           stationName: voucher.stationName,
           fuelLiters: voucher.fuelLiters,
           timeSlot: voucher.timeSlot,
@@ -211,7 +236,7 @@ export async function runAllocation(req, res) {
 
       // Emit global alert if warning or critical
       if (aiDecision.alertLevel !== "normal") {
-        io.emit("shortage_alert", {
+        emitShortageAlert(io, {
           alertLevel: aiDecision.alertLevel,
           message: aiDecision.recommendation,
         });
@@ -315,12 +340,37 @@ export async function simulateShortage(req, res) {
     }
 
     const allCancelled = [...cancelledTier4, ...cancelledTier3];
+    const cancelledVehicleIds = allCancelled.map((voucher) => voucher.vehicleId);
+    const cancelledVehicles = cancelledVehicleIds.length
+      ? await Vehicle.find({ _id: { $in: cancelledVehicleIds } })
+          .select("ownerId")
+          .lean()
+      : [];
+    const ownerLookup = cancelledVehicles.reduce((acc, vehicle) => {
+      acc[vehicle._id.toString()] = vehicle.ownerId?.toString() || null;
+      return acc;
+    }, {});
+
+    if (allCancelled.length > 0) {
+      const cancelReason =
+        "Fuel shortage simulation — your voucher has been cancelled.";
+      await Voucher.updateMany(
+        { _id: { $in: allCancelled.map((voucher) => voucher._id) } },
+        {
+          $set: {
+            cancelReason,
+            cancelledAt: new Date(),
+            cancelledBy: req.user.id,
+          },
+        },
+      );
+    }
 
     // 5. Emit Socket.io events
     const io = req.app.get("io");
     if (io) {
       // Global shortage alert to all connected clients
-      io.emit("shortage_alert", {
+      emitShortageAlert(io, {
         alertLevel: aiDecision.alertLevel,
         message: aiDecision.recommendation,
         stationFuelReduced: true,
@@ -328,8 +378,11 @@ export async function simulateShortage(req, res) {
 
       // Individual cancellation notice to each affected driver
       for (const voucher of allCancelled) {
-        io.to(voucher.vehicleId.toString()).emit("voucher_cancelled", {
+        emitVoucherCancelled(io, ownerLookup[voucher.vehicleId.toString()], {
           voucherId: voucher._id,
+          vehicleId: voucher.vehicleId,
+          stationId: voucher.stationId,
+          stationName: voucher.stationName,
           plateNumber: voucher.plateNumber,
           reason: "Fuel shortage simulation — your voucher has been cancelled.",
         });

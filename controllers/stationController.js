@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Station from "../models/Station.js";
 import Voucher from "../models/Voucher.js";
 import StationLog from "../models/StationLog.js";
+import User from "../models/User.js";
 import {
   emitShortageAlert,
   emitVoucherCancelled,
@@ -69,6 +70,30 @@ function buildStationSlots(station, reservedCounts) {
   return slots;
 }
 
+async function getAuthorizedStation(req, stationId) {
+  const station = await Station.findById(stationId);
+  if (!station) {
+    return { error: { status: 404, message: "Station not found." } };
+  }
+
+  if (req.user?.role === "staff") {
+    const staffUser = await User.findById(req.user.id).select("stationId").lean();
+    if (!staffUser?.stationId) {
+      return {
+        error: { status: 403, message: "Staff account is not assigned to a station." },
+      };
+    }
+
+    if (staffUser.stationId.toString() !== station._id.toString()) {
+      return {
+        error: { status: 403, message: "Access denied for another station." },
+      };
+    }
+  }
+
+  return { station };
+}
+
 export async function getStations(req, res) {
   try {
     const page = Math.max(Number(req.query.page) || 1, 1);
@@ -111,12 +136,14 @@ export async function getStationById(req, res) {
       return res.status(400).json({ message: "Invalid station ID." });
     }
 
-    const station = await Station.findById(id);
-    if (!station) {
-      return res.status(404).json({ message: "Station not found." });
+    const authorizedStation = await getAuthorizedStation(req, id);
+    if (authorizedStation.error) {
+      return res
+        .status(authorizedStation.error.status)
+        .json({ message: authorizedStation.error.message });
     }
 
-    return res.json(station);
+    return res.json(authorizedStation.station);
   } catch (error) {
     console.error("Get station by ID error:", error.message);
     return res
@@ -132,12 +159,13 @@ export async function getStationSlots(req, res) {
       return res.status(400).json({ message: "Invalid station ID." });
     }
 
-    const station = await Station.findById(id).select(
-      "name operatingHours slotsPerHour",
-    );
-    if (!station) {
-      return res.status(404).json({ message: "Station not found." });
+    const authorizedStation = await getAuthorizedStation(req, id);
+    if (authorizedStation.error) {
+      return res
+        .status(authorizedStation.error.status)
+        .json({ message: authorizedStation.error.message });
     }
+    const station = authorizedStation.station;
 
     const bounds = getDayBounds(req.query.date);
     if (!bounds) {
@@ -188,22 +216,42 @@ export async function getStationLog(req, res) {
       return res.status(400).json({ message: "Invalid station ID." });
     }
 
-    const stationExists = await Station.exists({ _id: id });
-    if (!stationExists) {
-      return res.status(404).json({ message: "Station not found." });
+    const authorizedStation = await getAuthorizedStation(req, id);
+    if (authorizedStation.error) {
+      return res
+        .status(authorizedStation.error.status)
+        .json({ message: authorizedStation.error.message });
     }
 
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const skip = (page - 1) * limit;
+    const bounds = getDayBounds(req.query.date);
+    if (!bounds) {
+      return res.status(400).json({ message: "Invalid date query format." });
+    }
 
     const [fuelEvents, redeemedVouchers] = await Promise.all([
-      StationLog.find({ stationId: id }).sort({ createdAt: -1 }).lean(),
-      Voucher.find({ stationId: id, status: "redeemed" })
+      StationLog.find({
+        stationId: id,
+        createdAt: { $gte: bounds.dayStart, $lt: bounds.dayEnd },
+      })
+        .sort({ createdAt: -1 })
+        .lean(),
+      Voucher.find({
+        stationId: id,
+        status: "redeemed",
+        redeemedAt: { $gte: bounds.dayStart, $lt: bounds.dayEnd },
+      })
         .select("fuelLiters plateNumber redeemedAt qrToken status")
         .sort({ redeemedAt: -1, updatedAt: -1 })
         .lean(),
     ]);
+    const stationLogVoucherIds = new Set(
+      fuelEvents
+        .filter((event) => event.voucherId)
+        .map((event) => event.voucherId.toString()),
+    );
 
     const fuelEventItems = fuelEvents.map((event) => ({
       id: event._id.toString(),
@@ -218,19 +266,21 @@ export async function getStationLog(req, res) {
       notes: event.notes || "",
     }));
 
-    const voucherEventItems = redeemedVouchers.map((voucher) => ({
-      id: voucher._id.toString(),
-      source: "voucher",
-      eventType: "voucher_redeem",
-      timestamp: voucher.redeemedAt || voucher.updatedAt,
-      litersDelta: -Math.abs(voucher.fuelLiters || 0),
-      beforeLiters: null,
-      afterLiters: null,
-      voucherId: voucher._id,
-      actorUserId: null,
-      notes: `Redeemed voucher for plate ${voucher.plateNumber}.`,
-      qrToken: voucher.qrToken,
-    }));
+    const voucherEventItems = redeemedVouchers
+      .filter((voucher) => !stationLogVoucherIds.has(voucher._id.toString()))
+      .map((voucher) => ({
+        id: voucher._id.toString(),
+        source: "voucher",
+        eventType: "voucher_redeem",
+        timestamp: voucher.redeemedAt || voucher.updatedAt,
+        litersDelta: -Math.abs(voucher.fuelLiters || 0),
+        beforeLiters: null,
+        afterLiters: null,
+        voucherId: voucher._id,
+        actorUserId: null,
+        notes: `Redeemed voucher for plate ${voucher.plateNumber}.`,
+        qrToken: voucher.qrToken,
+      }));
 
     const combinedEvents = [...fuelEventItems, ...voucherEventItems].sort(
       (a, b) =>
@@ -242,6 +292,9 @@ export async function getStationLog(req, res) {
     return res.json({
       page,
       limit,
+      date: bounds.isoDate,
+      stationId: authorizedStation.station._id,
+      stationName: authorizedStation.station.name,
       total: combinedEvents.length,
       events: paginatedEvents,
     });
@@ -439,10 +492,22 @@ export async function toggleStationStatus(req, res) {
     if (req.io && !station.isActive) {
       const affectedVouchers = await Voucher.find({
         stationId: station._id,
-        status: { $in: ["pending", "redeemed"] },
+        status: "pending",
       })
         .populate("vehicleId", "ownerId ownerName plateNumber")
-        .select("vehicleId status fuelLiters qrToken");
+        .select("vehicleId status fuelLiters qrToken stationName stationId");
+
+      await Voucher.updateMany(
+        { _id: { $in: affectedVouchers.map((voucher) => voucher._id) } },
+        {
+          $set: {
+            status: "cancelled",
+            cancelReason: "Station deactivated. Voucher allocation cancelled.",
+            cancelledAt: new Date(),
+            cancelledBy: req.user.id,
+          },
+        },
+      );
 
       emitShortageAlert(req.io, {
         stationId: station._id.toString(),

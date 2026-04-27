@@ -29,9 +29,20 @@ const vehicleSchema = new mongoose.Schema({
   registeredAt: { type: Date, default: Date.now },
 });
 
-vehicleSchema.pre("save", function () {
-  if (this.vehicleType) this.tierLevel = TIER_MAP[this.vehicleType];
-  next();
+function applyTierLevel(doc) {
+  if (doc?.vehicleType) {
+    doc.tierLevel = TIER_MAP[doc.vehicleType];
+  }
+}
+
+vehicleSchema.pre("validate", function () {
+  applyTierLevel(this);
+});
+
+vehicleSchema.pre("insertMany", function (docs = []) {
+  for (const doc of docs) {
+    applyTierLevel(doc);
+  }
 });
 
 export default mongoose.model("Vehicle", vehicleSchema);

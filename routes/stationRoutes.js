@@ -14,15 +14,12 @@ import { staffOrAdmin } from "../middleware/staffMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect);
-
 router.get("/", getStations);
-router.get("/:id", getStationById);
-router.get("/:id/slots", getStationSlots);
-router.get("/:id/log", staffOrAdmin, getStationLog);
-router.post("/", adminOnly, createStation);
-router.put("/:id/fuel", staffOrAdmin, updateStationFuel);
-router.patch("/:id/toggle", adminOnly, toggleStationStatus);
+router.get("/:id", protect, getStationById);
+router.get("/:id/slots", protect, getStationSlots);
+router.get("/:id/log", protect, staffOrAdmin, getStationLog);
+router.post("/", protect, adminOnly, createStation);
+router.put("/:id/fuel", protect, adminOnly, updateStationFuel);
+router.patch("/:id/toggle", protect, adminOnly, toggleStationStatus);
 
 export default router;
-
